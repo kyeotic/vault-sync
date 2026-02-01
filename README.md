@@ -4,7 +4,8 @@ Sync [Bitwarden Secrets Manager](https://bitwarden.com/products/secrets-manager/
 
 ## Prerequisites
 
-- [Bitwarden Secrets CLI (`bws`)](https://bitwarden.com/help/secrets-manager-cli/) installed and authenticated
+- [Bitwarden Secrets CLI (`bws`)](https://bitwarden.com/help/secrets-manager-cli/) installed
+- A `BWS_ACCESS_TOKEN` provided via environment variable or a `.bws` file (see below)
 
 ## Install
 
@@ -13,6 +14,21 @@ curl -fsSL https://raw.githubusercontent.com/kyeotic/dusk-warden/main/install.sh
 ```
 
 Or download a binary from the [releases page](https://github.com/kyeotic/dusk-warden/releases).
+
+## Access Token
+
+dusk-warden needs a `BWS_ACCESS_TOKEN` to authenticate with the Bitwarden Secrets CLI. It resolves the token in this order:
+
+1. **Environment variable** — if `BWS_ACCESS_TOKEN` is set, it is used directly.
+2. **`.bws` file** — otherwise, dusk-warden searches for a `.bws` file starting from the current directory and walking up parent directories, stopping at `$HOME`.
+
+A `.bws` file uses simple `KEY=value` format:
+
+```
+BWS_ACCESS_TOKEN=0.your-token-here
+```
+
+Quotes around the value are optional and will be stripped. This file should be added to your global `.gitignore` to avoid committing credentials.
 
 ## Quick Start
 

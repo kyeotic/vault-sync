@@ -28,9 +28,10 @@ fn main() -> Result<()> {
 
 fn sync() -> Result<()> {
     let config = Config::load()?;
+    let token = config::resolve_bws_token()?;
 
     for secret in &config.secrets {
-        let value = fetch_secret(&secret.id)
+        let value = fetch_secret(&secret.id, &token)
             .with_context(|| format!("Failed to fetch secret for {}", secret.path))?;
 
         std::fs::write(&secret.path, value)
@@ -42,9 +43,10 @@ fn sync() -> Result<()> {
     Ok(())
 }
 
-fn fetch_secret(secret_id: &str) -> Result<String> {
+fn fetch_secret(secret_id: &str, token: &str) -> Result<String> {
     let output = Command::new("bws")
         .args(["secret", "get", secret_id])
+        .env("BWS_ACCESS_TOKEN", token)
         .output()
         .context("Failed to run bws CLI. Is it installed?")?;
 
