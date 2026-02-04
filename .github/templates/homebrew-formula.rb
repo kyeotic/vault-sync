@@ -1,4 +1,4 @@
-class StackSync < Formula
+class VaultSync < Formula
   desc "A CLI tool for syncing secret files across devices"
   homepage "https://github.com/kyeotic/vault-sync"
   version "${VERSION}"
