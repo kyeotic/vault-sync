@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
 use crate::reporter::Reporter;
+use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
 use std::io::Read;
 use tar::Archive;
@@ -37,13 +37,13 @@ fn version_from_tag(tag: &str) -> &str {
 }
 
 pub fn update() -> Result<()> {
-    if let Ok(exe) = std::env::current_exe() {
-        if exe.to_string_lossy().contains("/nix/store/") {
-            anyhow::bail!(
-                "This binary was installed via Nix. Update with:\n  \
+    if let Ok(exe) = std::env::current_exe()
+        && exe.to_string_lossy().contains("/nix/store/")
+    {
+        anyhow::bail!(
+            "This binary was installed via Nix. Update with:\n  \
                  nix profile upgrade --flake github:kyeotic/vault-sync"
-            );
-        }
+        );
     }
 
     let agent = ureq::Agent::new_with_defaults();
