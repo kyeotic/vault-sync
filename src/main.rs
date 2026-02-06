@@ -1,27 +1,14 @@
 mod config;
+mod reporter;
+mod styles;
 mod update;
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use config::Config;
-use owo_colors::OwoColorize;
 use rayon::prelude::*;
+use reporter::Reporter;
 use std::process::Command;
-
-/// Print a cargo-style status line with a bold green label (for actions taken).
-fn status_green(label: &str, message: &str) {
-    println!("{:>12} {}", label.bold().green(), message);
-}
-
-/// Print a cargo-style status line with a bold cyan label (for no change needed).
-fn status_cyan(label: &str, message: &str) {
-    println!("{:>12} {}", label.bold().cyan(), message);
-}
-
-/// Print a cargo-style status line with a bold yellow label (for dry-run preview).
-fn status_yellow(label: &str, message: &str) {
-    println!("{:>12} {}", label.bold().yellow(), message);
-}
 
 #[derive(Parser)]
 #[command(name = "vault-sync", about = "Sync Bitwarden secrets to .env files")]
@@ -75,14 +62,14 @@ fn sync(dry_run: bool) -> Result<()> {
 
         if changed {
             if dry_run {
-                status_yellow("Would update", &secret.path);
+                Reporter::would_update(&secret.path);
             } else {
                 std::fs::write(&secret.path, &value)
                     .with_context(|| format!("Failed to write {}", secret.path))?;
-                status_green("Updated", &secret.path);
+                Reporter::updated(&secret.path);
             }
         } else {
-            status_cyan("Up to date", &secret.path);
+            Reporter::up_to_date(&secret.path);
         }
     }
 
@@ -100,7 +87,7 @@ fn push() -> Result<()> {
         update_secret(&secret.id, &value, &token)
             .with_context(|| format!("Failed to push secret for {}", secret.path))?;
 
-        status_green("Pushed", &secret.path);
+        Reporter::pushed(&secret.path);
     }
 
     Ok(())

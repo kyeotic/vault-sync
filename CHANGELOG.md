@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.5] - 2026-02-05
+
+### Changed
+- Styled output for `update` command (version info, download progress, completion).
+- Added `NO_COLOR` environment variable support for disabling colored output.
+
 ## [0.5.4] - 2026-02-03
 
 ### Added

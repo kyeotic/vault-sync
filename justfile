@@ -45,3 +45,6 @@ release *args:
 
 install-local:
     cargo install --path .
+
+style-watch:
+    bacon test -- -- --show-output style_gallery

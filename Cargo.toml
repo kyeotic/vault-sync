@@ -1,6 +1,6 @@
 [package]
 name = "vault-sync"
-version = "0.5.4"
+version = "0.5.5"
 edition = "2024"
 publish = false
 
@@ -15,7 +15,8 @@ ureq = { version = "3", features = ["json"] }
 self-replace = "1"
 flate2 = "1"
 tar = "0.4"
-owo-colors = "4"
+owo-colors = { version = "4", features = ["supports-colors"] }
+console = "0.16"
 rayon = "1"
 
 [profile.release]

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use crate::reporter::Reporter;
 use flate2::read::GzDecoder;
 use std::io::Read;
 use tar::Archive;
@@ -40,11 +41,11 @@ pub fn update() -> Result<()> {
     let latest_tag = fetch_latest_tag(&agent)?;
     let latest_version = version_from_tag(&latest_tag);
 
-    println!("Current version: {CURRENT_VERSION}");
-    println!("Latest version:  {latest_version}");
+    Reporter::current_version(CURRENT_VERSION);
+    Reporter::latest_version(latest_version);
 
     if latest_version == CURRENT_VERSION {
-        println!("Already up to date.");
+        Reporter::already_up_to_date();
         return Ok(());
     }
 
@@ -53,7 +54,7 @@ pub fn update() -> Result<()> {
         "https://github.com/{REPO}/releases/download/{latest_tag}/vault-sync-{target}.tar.gz"
     );
 
-    println!("Downloading {url}...");
+    Reporter::downloading(&url);
     let mut gz_bytes = Vec::new();
     agent
         .get(&url)
@@ -89,6 +90,6 @@ pub fn update() -> Result<()> {
     self_replace::self_replace(&tmp).context("Failed to replace binary")?;
     let _ = std::fs::remove_file(&tmp);
 
-    println!("Updated to {latest_version}");
+    Reporter::self_updated(latest_version);
     Ok(())
 }
