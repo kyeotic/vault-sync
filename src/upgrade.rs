@@ -36,7 +36,7 @@ fn version_from_tag(tag: &str) -> &str {
     tag.strip_prefix('v').unwrap_or(tag)
 }
 
-pub fn update() -> Result<()> {
+pub fn upgrade() -> Result<()> {
     if let Ok(exe) = std::env::current_exe()
         && exe.to_string_lossy().contains("/nix/store/")
     {

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 use minijinja::{Environment, context};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -13,7 +14,7 @@ pub struct Config {
     pub max_threads: usize,
     #[serde(default = "default_max_retries")]
     pub max_retries: u32,
-    pub secrets: Vec<SecretMapping>,
+    pub secrets: IndexMap<String, SecretMapping>,
 }
 
 fn default_max_threads() -> usize {
@@ -26,6 +27,8 @@ fn default_max_retries() -> u32 {
 
 #[derive(Deserialize)]
 pub struct SecretMapping {
+    #[serde(skip)]
+    pub name: String,
     pub id: String,
     pub path: String,
 }
@@ -38,6 +41,10 @@ impl Config {
         let mut config: Config =
             toml::from_str(&content).with_context(|| format!("Failed to parse {CONFIG_FILE}"))?;
 
+        for (key, secret) in &mut config.secrets {
+            secret.name = key.clone();
+        }
+
         config.expand_templates()?;
         Ok(config)
     }
@@ -45,9 +52,9 @@ impl Config {
     fn expand_templates(&mut self) -> Result<()> {
         let env_vars: HashMap<String, String> = std::env::vars().collect();
 
-        for secret in &mut self.secrets {
+        for (name, secret) in &mut self.secrets {
             secret.path = expand_template(&secret.path, &env_vars)
-                .with_context(|| format!("Failed to expand template in path: {}", secret.path))?;
+                .with_context(|| format!("Failed to expand template in path for secret '{name}': {}", secret.path))?;
         }
 
         Ok(())

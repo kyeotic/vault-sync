@@ -1,11 +1,11 @@
 mod config;
 mod reporter;
 mod styles;
-mod update;
+mod upgrade;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::Config;
+use config::{Config, SecretMapping};
 use rayon::prelude::*;
 use reporter::Reporter;
 use std::process::Command;
@@ -23,9 +23,12 @@ enum Cli {
         dry_run: bool,
     },
     /// Upload local .env files to Bitwarden secrets
-    Push,
-    /// Update vault-sync to the latest release
-    Update,
+    Push {
+        /// Name of a specific secret to push (from config [secrets.<name>])
+        target: Option<String>,
+    },
+    /// Upgrade vault-sync to the latest release
+    Upgrade,
     /// Print version information
     Version,
 }
@@ -35,8 +38,8 @@ fn main() -> Result<()> {
 
     match cli {
         Cli::Sync { dry_run } => sync(dry_run)?,
-        Cli::Push => push()?,
-        Cli::Update => update::update()?,
+        Cli::Push { target } => push(target)?,
+        Cli::Upgrade => upgrade::upgrade()?,
         Cli::Version => println!("vault-sync {}", env!("CARGO_PKG_VERSION")),
     }
 
@@ -53,15 +56,15 @@ fn sync(dry_run: bool) -> Result<()> {
         .build()
         .context("Failed to build thread pool")?;
 
+    let entries: Vec<_> = config.secrets.values().collect();
     let results: Vec<_> = pool.install(|| {
-        config
-            .secrets
+        entries
             .par_iter()
             .map(|secret| {
-                let value = fetch_secret(&secret.id, &token, &secret.path, config.max_retries)
-                    .with_context(|| format!("Failed to fetch secret for {}", secret.path))?;
+                let value = fetch_secret(secret, &token, config.max_retries)
+                    .with_context(|| format!("Failed to fetch secret '{}' for {}", secret.name, secret.path))?;
                 let existing = std::fs::read_to_string(&secret.path).ok();
-                Ok((secret, value, existing))
+                Ok((*secret, value, existing))
             })
             .collect::<Result<Vec<_>>>()
     })?;
@@ -72,38 +75,49 @@ fn sync(dry_run: bool) -> Result<()> {
 
         if changed {
             if dry_run {
-                Reporter::would_update(&secret.path);
+                Reporter::would_update(secret);
             } else {
                 std::fs::write(&secret.path, &value)
                     .with_context(|| format!("Failed to write {}", secret.path))?;
-                Reporter::updated(&secret.path);
+                Reporter::updated(secret);
             }
         } else {
-            Reporter::up_to_date(&secret.path);
+            Reporter::up_to_date(secret);
         }
     }
 
     Ok(())
 }
 
-fn push() -> Result<()> {
+fn push(target: Option<String>) -> Result<()> {
     let config = Config::load()?;
     let token = config::resolve_bws_token()?;
 
-    for secret in &config.secrets {
+    let secrets: Vec<_> = match &target {
+        Some(name) => {
+            let secret = config.secrets.get(name).with_context(|| {
+                let available: Vec<_> = config.secrets.keys().collect();
+                format!("Secret '{name}' not found in config. Available: {available:?}")
+            })?;
+            vec![secret]
+        }
+        None => config.secrets.values().collect(),
+    };
+
+    for secret in secrets {
         let value = std::fs::read_to_string(&secret.path)
             .with_context(|| format!("Failed to read {}", secret.path))?;
 
-        update_secret(&secret.id, &value, &token, &secret.path, config.max_retries)
-            .with_context(|| format!("Failed to push secret for {}", secret.path))?;
+        update_secret(secret, &value, &token, config.max_retries)
+            .with_context(|| format!("Failed to push secret '{}' for {}", secret.name, secret.path))?;
 
-        Reporter::pushed(&secret.path);
+        Reporter::pushed(secret);
     }
 
     Ok(())
 }
 
-fn run_bws(args: &[&str], token: &str, name: &str, max_retries: u32) -> Result<std::process::Output> {
+fn run_bws(args: &[&str], token: &str, secret: &SecretMapping, max_retries: u32) -> Result<std::process::Output> {
     for attempt in 1..=max_retries {
         let output = Command::new("bws")
             .args(args)
@@ -117,7 +131,7 @@ fn run_bws(args: &[&str], token: &str, name: &str, max_retries: u32) -> Result<s
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         if stderr.contains("429") && attempt < max_retries {
-            Reporter::retrying(name, attempt, max_retries);
+            Reporter::retrying(secret, attempt, max_retries);
             thread::sleep(Duration::from_secs(1 << attempt)); // 2s, 4s
             continue;
         }
@@ -128,12 +142,12 @@ fn run_bws(args: &[&str], token: &str, name: &str, max_retries: u32) -> Result<s
     unreachable!()
 }
 
-fn update_secret(secret_id: &str, value: &str, token: &str, name: &str, max_retries: u32) -> Result<()> {
-    let output = run_bws(&["secret", "edit", "--value", value, secret_id], token, name, max_retries)?;
+fn update_secret(secret: &SecretMapping, value: &str, token: &str, max_retries: u32) -> Result<()> {
+    let output = run_bws(&["secret", "edit", "--value", value, &secret.id], token, secret, max_retries)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(check_bws_error(&stderr, secret_id));
+        return Err(check_bws_error(&stderr, &secret.id));
     }
 
     Ok(())
@@ -150,8 +164,8 @@ fn check_bws_error(stderr: &str, secret_id: &str) -> anyhow::Error {
     }
 }
 
-fn fetch_secret(secret_id: &str, token: &str, name: &str, max_retries: u32) -> Result<String> {
-    let output = run_bws(&["secret", "get", secret_id], token, name, max_retries)?;
+fn fetch_secret(secret: &SecretMapping, token: &str, max_retries: u32) -> Result<String> {
+    let output = run_bws(&["secret", "get", &secret.id], token, secret, max_retries)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

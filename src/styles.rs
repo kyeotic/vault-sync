@@ -26,6 +26,10 @@ pub trait AppStyles: OwoColorize + Sized + Display {
         self.style_if_supported(Style::new().bold())
     }
 
+    fn dimmed(&self) -> String {
+        self.style_if_supported(Style::new().dimmed())
+    }
+
     /// Applies a style unless NO_COLOR env var is set
     fn style_if_supported(&self, style: Style) -> String {
         // The built in self.if_supports_color breaks in bacon

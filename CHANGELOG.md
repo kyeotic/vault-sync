@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-02-06
+
+### Breaking Changes
+- **Config format**: Secrets are now named maps instead of arrays. `[[secrets]]` becomes `[secrets.<name>]` with a unique name for each secret.
+- **`update` command renamed to `upgrade`**: Use `vault-sync upgrade` instead of `vault-sync update`.
+
+### Added
+- Named secrets: each secret in `.vault-sync.toml` now has a unique name (the TOML table key).
+- `push` accepts an optional positional argument to target a single secret by name (e.g., `vault-sync push api`).
+- Reporter output now shows the secret name with a dimmed path for context.
+
 ## [0.5.8] - 2026-02-06
 
 ### Added
